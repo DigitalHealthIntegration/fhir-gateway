@@ -85,7 +85,8 @@ public abstract class HttpFhirClient {
           "x-request-id",
           "x-correlation-id",
           "x-forwarded-for",
-          "x-forwarded-host");
+          "x-forwarded-host",
+          "authorization");
 
   protected abstract String getBaseUrl();
 
@@ -141,7 +142,7 @@ public abstract class HttpFhirClient {
   }
 
   private HttpResponse sendRequest(RequestBuilder builder) throws IOException {
-    Preconditions.checkArgument(builder.getFirstHeader("Authorization") == null);
+//    Preconditions.checkArgument(builder.getFirstHeader("Authorization") == null);
     Header header = getAuthHeader();
     builder.addHeader(header);
     HttpUriRequest httpRequest = builder.build();
