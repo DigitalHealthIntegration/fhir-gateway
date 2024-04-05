@@ -21,6 +21,9 @@ import com.google.fhir.gateway.interfaces.AccessDecision;
 import com.google.fhir.gateway.interfaces.RequestDetailsReader;
 import com.google.fhir.gateway.interfaces.RequestMutation;
 import java.io.IOException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import org.apache.http.HttpResponse;
 import org.hl7.fhir.r4.model.*;
 import org.jetbrains.annotations.Nullable;
@@ -67,7 +70,11 @@ public class AccessGrantedAndMutateContent implements AccessDecision {
   }
 
   private void preProcess(Resource resource) {
-    switch (resource.getResourceType()) {
+    ResourceType resourceType = resource.getResourceType();
+    String encodedId = encodeString(resource.getIdElement().getIdPart());
+    resource.setId(resourceType.name() + "/" + encodedId);
+
+    switch (resourceType) {
       case AllergyIntolerance:
         processAllergyIntolerance((AllergyIntolerance) resource);
         break;
@@ -553,7 +560,18 @@ public class AccessGrantedAndMutateContent implements AccessDecision {
     }
   }
 
-  private void processPatient(Patient patient) {}
+  private void processPatient(Patient patient) {
+    patient.setIdentifier(new ArrayList<>());
+    patient.setName(new ArrayList<>());
+    patient.setTelecom(new ArrayList<>());
+    patient.setAddress(new ArrayList<>());
+    patient.setPhoto(new ArrayList<>());
+    patient.setContact(new ArrayList<>());
+    removeDisplayFromReference(patient.getManagingOrganization());
+    for (Patient.PatientLinkComponent linkComponent : patient.getLink()) {
+      removeDisplayFromReference(linkComponent.getOther());
+    }
+  }
 
   private void processPractitioner(Practitioner practitioner) {}
 
@@ -656,5 +674,22 @@ public class AccessGrantedAndMutateContent implements AccessDecision {
     for (Reference reference : clinicalImpression.getSupportingInfo()) {
       removeDisplayFromReference(reference);
     }
+  }
+
+  private String encodeString(String str) {
+    try {
+      MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
+      byte[] hashBytes = messageDigest.digest(str.getBytes());
+      StringBuilder hexString = new StringBuilder();
+      for (byte b : hashBytes) {
+        String hex = Integer.toHexString(0xff & b);
+        if (hex.length() == 1) hexString.append('0');
+        hexString.append(hex);
+      }
+      return hexString.toString();
+    } catch (NoSuchAlgorithmException ex) {
+      // Do nothing
+    }
+    return null;
   }
 }
