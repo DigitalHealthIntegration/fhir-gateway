@@ -49,7 +49,7 @@ public class AccessGrantedAndMutateContent implements AccessDecision {
     }
     Bundle requestBundle = FhirUtil.parseRequestToBundle(fhirContext, requestDetailsReader);
     for (Bundle.BundleEntryComponent bundleEntryComponent : requestBundle.getEntry()) {
-      preProcess(bundleEntryComponent.getResource());
+      preProcess(bundleEntryComponent);
     }
     String bundleString = fhirContext.newJsonParser().encodeResourceToString(requestBundle);
     return RequestMutation.builder().requestContent(bundleString.getBytes()).build();
@@ -65,13 +65,29 @@ public class AccessGrantedAndMutateContent implements AccessDecision {
     return new AccessGrantedAndMutateContent(fhirContext);
   }
 
-  private void removeDisplayFromReference(Reference reference) {
+  private void deIdentifyReferenceElement(Reference reference) {
+    String referenceString = reference.getReference();
+    if (referenceString == null) {
+      return;
+    }
+    String encodedReferenceId = encodeString(getIdPartFromElement(referenceString));
+    String referenceResourceType = reference.getResource().fhirType();
+    reference.setReference(referenceResourceType + "/" + encodedReferenceId);
     reference.setDisplay(null);
   }
 
-  private void preProcess(Resource resource) {
+  private void preProcess(Bundle.BundleEntryComponent bundleEntryComponent) {
+    String fullUrl = bundleEntryComponent.getFullUrl();
+    Resource resource = bundleEntryComponent.getResource();
     ResourceType resourceType = resource.getResourceType();
-    String encodedId = encodeString(resource.getIdElement().getIdPart());
+    String encodedId;
+
+    if (fullUrl != null) {
+      encodedId = encodeString(getIdPartFromElement(bundleEntryComponent.getFullUrl()));
+      bundleEntryComponent.setFullUrl(resourceType.name() + "/" + encodedId);
+    } else {
+      encodedId = encodeString(getIdPartFromElement(resource.getId()));
+    }
     resource.setId(resourceType.name() + "/" + encodedId);
 
     switch (resourceType) {
@@ -174,402 +190,403 @@ public class AccessGrantedAndMutateContent implements AccessDecision {
   }
 
   private void processAllergyIntolerance(AllergyIntolerance allergyIntolerance) {
-    removeDisplayFromReference(allergyIntolerance.getPatient());
-    removeDisplayFromReference(allergyIntolerance.getEncounter());
-    removeDisplayFromReference(allergyIntolerance.getRecorder());
-    removeDisplayFromReference(allergyIntolerance.getAsserter());
+    deIdentifyReferenceElement(allergyIntolerance.getPatient());
+    deIdentifyReferenceElement(allergyIntolerance.getEncounter());
+    deIdentifyReferenceElement(allergyIntolerance.getRecorder());
+    deIdentifyReferenceElement(allergyIntolerance.getAsserter());
   }
 
   private void processAppointment(Appointment appointment) {
     for (Reference reference : appointment.getReasonReference()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : appointment.getSupportingInformation()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : appointment.getSlot()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : appointment.getBasedOn()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Appointment.AppointmentParticipantComponent participantComponent :
         appointment.getParticipant()) {
-      removeDisplayFromReference(participantComponent.getActor());
+      deIdentifyReferenceElement(participantComponent.getActor());
     }
   }
 
   private void processCarePlan(CarePlan carePlan) {
     for (Reference reference : carePlan.getBasedOn()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : carePlan.getReplaces()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : carePlan.getPartOf()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
-    removeDisplayFromReference(carePlan.getSubject());
-    removeDisplayFromReference(carePlan.getEncounter());
-    removeDisplayFromReference(carePlan.getAuthor());
+    deIdentifyReferenceElement(carePlan.getSubject());
+    deIdentifyReferenceElement(carePlan.getEncounter());
+    deIdentifyReferenceElement(carePlan.getAuthor());
     for (Reference reference : carePlan.getContributor()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : carePlan.getCareTeam()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : carePlan.getAddresses()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : carePlan.getSupportingInfo()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : carePlan.getGoal()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (CarePlan.CarePlanActivityComponent activityComponent : carePlan.getActivity()) {
-      removeDisplayFromReference(activityComponent.getReference());
+      deIdentifyReferenceElement(activityComponent.getReference());
       for (Reference reference : activityComponent.getOutcomeReference()) {
-        removeDisplayFromReference(reference);
+        deIdentifyReferenceElement(reference);
       }
     }
   }
 
   private void processClaim(Claim claim) {
-    removeDisplayFromReference(claim.getPatient());
-    removeDisplayFromReference(claim.getEnterer());
-    removeDisplayFromReference(claim.getInsurer());
-    removeDisplayFromReference(claim.getProvider());
-    removeDisplayFromReference(claim.getReferral());
+    deIdentifyReferenceElement(claim.getPatient());
+    deIdentifyReferenceElement(claim.getEnterer());
+    deIdentifyReferenceElement(claim.getInsurer());
+    deIdentifyReferenceElement(claim.getProvider());
+    deIdentifyReferenceElement(claim.getReferral());
   }
 
   private void processComposition(Composition composition) {
-    removeDisplayFromReference(composition.getSubject());
-    removeDisplayFromReference(composition.getEncounter());
+    deIdentifyReferenceElement(composition.getSubject());
+    deIdentifyReferenceElement(composition.getEncounter());
     for (Reference reference : composition.getAuthor()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
-    removeDisplayFromReference(composition.getCustodian());
+    deIdentifyReferenceElement(composition.getCustodian());
   }
 
   private void processCondition(Condition condition) {
-    removeDisplayFromReference(condition.getSubject());
-    removeDisplayFromReference(condition.getEncounter());
-    removeDisplayFromReference(condition.getRecorder());
-    removeDisplayFromReference(condition.getAsserter());
+    deIdentifyReferenceElement(condition.getSubject());
+    deIdentifyReferenceElement(condition.getEncounter());
+    deIdentifyReferenceElement(condition.getRecorder());
+    deIdentifyReferenceElement(condition.getAsserter());
     for (Condition.ConditionStageComponent stageComponent : condition.getStage()) {
       for (Reference reference : stageComponent.getAssessment()) {
-        removeDisplayFromReference(reference);
+        deIdentifyReferenceElement(reference);
       }
     }
     for (Condition.ConditionEvidenceComponent evidenceComponent : condition.getEvidence()) {
       for (Reference reference : evidenceComponent.getDetail()) {
-        removeDisplayFromReference(reference);
+        deIdentifyReferenceElement(reference);
       }
     }
   }
 
   private void processDiagnosticReport(DiagnosticReport diagnosticReport) {
     for (Reference reference : diagnosticReport.getBasedOn()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
-    removeDisplayFromReference(diagnosticReport.getSubject());
-    removeDisplayFromReference(diagnosticReport.getEncounter());
+    deIdentifyReferenceElement(diagnosticReport.getSubject());
+    deIdentifyReferenceElement(diagnosticReport.getEncounter());
     for (Reference reference : diagnosticReport.getPerformer()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : diagnosticReport.getResultsInterpreter()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : diagnosticReport.getSpecimen()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : diagnosticReport.getResult()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : diagnosticReport.getImagingStudy()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
   }
 
   private void processEncounter(Encounter encounter) {
-    removeDisplayFromReference(encounter.getSubject());
+    deIdentifyReferenceElement(encounter.getSubject());
     for (Reference reference : encounter.getEpisodeOfCare()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : encounter.getBasedOn()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Encounter.EncounterParticipantComponent participantComponent :
         encounter.getParticipant()) {
-      removeDisplayFromReference(participantComponent.getIndividual());
+      deIdentifyReferenceElement(participantComponent.getIndividual());
     }
     for (Reference reference : encounter.getAppointment()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : encounter.getReasonReference()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Encounter.DiagnosisComponent diagnosisComponent : encounter.getDiagnosis()) {
-      removeDisplayFromReference(diagnosisComponent.getCondition());
+      deIdentifyReferenceElement(diagnosisComponent.getCondition());
     }
     for (Reference reference : encounter.getAccount()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
-    removeDisplayFromReference(encounter.getHospitalization().getOrigin());
-    removeDisplayFromReference(encounter.getHospitalization().getDestination());
+    deIdentifyReferenceElement(encounter.getHospitalization().getOrigin());
+    deIdentifyReferenceElement(encounter.getHospitalization().getDestination());
     for (Encounter.EncounterLocationComponent locationComponent : encounter.getLocation()) {
-      removeDisplayFromReference(locationComponent.getLocation());
+      deIdentifyReferenceElement(locationComponent.getLocation());
     }
-    removeDisplayFromReference(encounter.getServiceProvider());
-    removeDisplayFromReference(encounter.getPartOf());
+    deIdentifyReferenceElement(encounter.getServiceProvider());
+    deIdentifyReferenceElement(encounter.getPartOf());
   }
 
   private void processEpisodeOfCare(EpisodeOfCare episodeOfCare) {
     for (EpisodeOfCare.DiagnosisComponent diagnosisComponent : episodeOfCare.getDiagnosis()) {
-      removeDisplayFromReference(diagnosisComponent.getCondition());
+      deIdentifyReferenceElement(diagnosisComponent.getCondition());
     }
-    removeDisplayFromReference(episodeOfCare.getPatient());
-    removeDisplayFromReference(episodeOfCare.getManagingOrganization());
+    deIdentifyReferenceElement(episodeOfCare.getPatient());
+    deIdentifyReferenceElement(episodeOfCare.getManagingOrganization());
     for (Reference reference : episodeOfCare.getReferralRequest()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
-    removeDisplayFromReference(episodeOfCare.getCareManager());
+    deIdentifyReferenceElement(episodeOfCare.getCareManager());
     for (Reference reference : episodeOfCare.getTeam()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : episodeOfCare.getAccount()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
   }
 
   private void processHealthService(HealthcareService healthcareService) {
-    removeDisplayFromReference(healthcareService.getProvidedBy());
+    deIdentifyReferenceElement(healthcareService.getProvidedBy());
     for (Reference reference : healthcareService.getLocation()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : healthcareService.getCoverageArea()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : healthcareService.getEndpoint()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
   }
 
   private void processImagingStudy(ImagingStudy imagingStudy) {
-    removeDisplayFromReference(imagingStudy.getSubject());
-    removeDisplayFromReference(imagingStudy.getEncounter());
+    deIdentifyReferenceElement(imagingStudy.getSubject());
+    deIdentifyReferenceElement(imagingStudy.getEncounter());
     for (Reference reference : imagingStudy.getBasedOn()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : imagingStudy.getInterpreter()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : imagingStudy.getEndpoint()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
-    removeDisplayFromReference(imagingStudy.getProcedureReference());
-    removeDisplayFromReference(imagingStudy.getLocation());
+    deIdentifyReferenceElement(imagingStudy.getProcedureReference());
+    deIdentifyReferenceElement(imagingStudy.getLocation());
     for (Reference reference : imagingStudy.getReasonReference()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (ImagingStudy.ImagingStudySeriesComponent studySeriesComponent : imagingStudy.getSeries()) {
       for (Reference reference : studySeriesComponent.getEndpoint()) {
-        removeDisplayFromReference(reference);
+        deIdentifyReferenceElement(reference);
       }
       for (Reference reference : studySeriesComponent.getSpecimen()) {
-        removeDisplayFromReference(reference);
+        deIdentifyReferenceElement(reference);
       }
       for (ImagingStudy.ImagingStudySeriesPerformerComponent performerComponent :
           studySeriesComponent.getPerformer()) {
-        removeDisplayFromReference(performerComponent.getActor());
+        deIdentifyReferenceElement(performerComponent.getActor());
       }
     }
   }
 
   private void processImmunization(Immunization immunization) {
-    removeDisplayFromReference(immunization.getPatient());
-    removeDisplayFromReference(immunization.getEncounter());
-    removeDisplayFromReference(immunization.getLocation());
-    removeDisplayFromReference(immunization.getManufacturer());
+    deIdentifyReferenceElement(immunization.getPatient());
+    deIdentifyReferenceElement(immunization.getEncounter());
+    deIdentifyReferenceElement(immunization.getLocation());
+    deIdentifyReferenceElement(immunization.getManufacturer());
     for (Immunization.ImmunizationPerformerComponent performerComponent :
         immunization.getPerformer()) {
-      removeDisplayFromReference(performerComponent.getActor());
+      deIdentifyReferenceElement(performerComponent.getActor());
     }
     for (Reference reference : immunization.getReasonReference()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Immunization.ImmunizationReactionComponent reactionComponent :
         immunization.getReaction()) {
-      removeDisplayFromReference(reactionComponent.getDetail());
+      deIdentifyReferenceElement(reactionComponent.getDetail());
     }
     for (Immunization.ImmunizationProtocolAppliedComponent protocolAppliedComponent :
         immunization.getProtocolApplied()) {
-      removeDisplayFromReference(protocolAppliedComponent.getAuthority());
+      deIdentifyReferenceElement(protocolAppliedComponent.getAuthority());
     }
   }
 
   private void processList(ListResource list) {
-    removeDisplayFromReference(list.getSubject());
-    removeDisplayFromReference(list.getEncounter());
-    removeDisplayFromReference(list.getSource());
+    deIdentifyReferenceElement(list.getSubject());
+    deIdentifyReferenceElement(list.getEncounter());
+    deIdentifyReferenceElement(list.getSource());
   }
 
   private void processLocation(Location location) {
-    removeDisplayFromReference(location.getManagingOrganization());
-    removeDisplayFromReference(location.getPartOf());
+    deIdentifyReferenceElement(location.getManagingOrganization());
+    deIdentifyReferenceElement(location.getPartOf());
     for (Reference reference : location.getEndpoint()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
   }
 
   private void processMedia(Media media) {
     for (Reference reference : media.getBasedOn()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : media.getPartOf()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
-    removeDisplayFromReference(media.getSubject());
-    removeDisplayFromReference(media.getEncounter());
-    removeDisplayFromReference(media.getOperator());
-    removeDisplayFromReference(media.getDevice());
+    deIdentifyReferenceElement(media.getSubject());
+    deIdentifyReferenceElement(media.getEncounter());
+    deIdentifyReferenceElement(media.getOperator());
+    deIdentifyReferenceElement(media.getDevice());
   }
 
   private void processMedication(Medication medication) {
-    removeDisplayFromReference(medication.getManufacturer());
+    deIdentifyReferenceElement(medication.getManufacturer());
   }
 
   private void processMedicationAdministration(MedicationAdministration medicationAdministration) {
     for (Reference reference : medicationAdministration.getPartOf()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
-    removeDisplayFromReference(medicationAdministration.getSubject());
-    removeDisplayFromReference(medicationAdministration.getContext());
+    deIdentifyReferenceElement(medicationAdministration.getSubject());
+    deIdentifyReferenceElement(medicationAdministration.getContext());
     for (Reference reference : medicationAdministration.getSupportingInformation()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : medicationAdministration.getReasonReference()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
-    removeDisplayFromReference(medicationAdministration.getRequest());
+    deIdentifyReferenceElement(medicationAdministration.getRequest());
     for (Reference reference : medicationAdministration.getDevice()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : medicationAdministration.getEventHistory()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
   }
 
   private void processMedicationDispense(MedicationDispense medicationDispense) {
     for (Reference reference : medicationDispense.getPartOf()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
-    removeDisplayFromReference(medicationDispense.getSubject());
-    removeDisplayFromReference(medicationDispense.getContext());
+    deIdentifyReferenceElement(medicationDispense.getSubject());
+    deIdentifyReferenceElement(medicationDispense.getContext());
     for (Reference reference : medicationDispense.getSupportingInformation()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
-    removeDisplayFromReference(medicationDispense.getLocation());
+    deIdentifyReferenceElement(medicationDispense.getLocation());
     for (Reference reference : medicationDispense.getAuthorizingPrescription()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
-    removeDisplayFromReference(medicationDispense.getDestination());
+    deIdentifyReferenceElement(medicationDispense.getDestination());
     for (Reference reference : medicationDispense.getReceiver()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : medicationDispense.getDetectedIssue()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : medicationDispense.getEventHistory()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
   }
 
   private void processMedicationRequest(MedicationRequest medicationRequest) {
-    removeDisplayFromReference(medicationRequest.getSubject());
-    removeDisplayFromReference(medicationRequest.getEncounter());
+    deIdentifyReferenceElement(medicationRequest.getSubject());
+    deIdentifyReferenceElement(medicationRequest.getEncounter());
     for (Reference reference : medicationRequest.getSupportingInformation()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
-    removeDisplayFromReference(medicationRequest.getRequester());
-    removeDisplayFromReference(medicationRequest.getPerformer());
-    removeDisplayFromReference(medicationRequest.getRecorder());
+    deIdentifyReferenceElement(medicationRequest.getRequester());
+    deIdentifyReferenceElement(medicationRequest.getPerformer());
+    deIdentifyReferenceElement(medicationRequest.getRecorder());
     for (Reference reference : medicationRequest.getReasonReference()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : medicationRequest.getBasedOn()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : medicationRequest.getInsurance()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
-    removeDisplayFromReference(medicationRequest.getPriorPrescription());
+    deIdentifyReferenceElement(medicationRequest.getPriorPrescription());
   }
 
   private void processMedicationStatement(MedicationStatement medicationStatement) {
     for (Reference reference : medicationStatement.getBasedOn()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : medicationStatement.getPartOf()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
-    removeDisplayFromReference(medicationStatement.getSubject());
-    removeDisplayFromReference(medicationStatement.getContext());
-    removeDisplayFromReference(medicationStatement.getContext());
-    removeDisplayFromReference(medicationStatement.getInformationSource());
+    deIdentifyReferenceElement(medicationStatement.getSubject());
+    deIdentifyReferenceElement(medicationStatement.getContext());
+    deIdentifyReferenceElement(medicationStatement.getContext());
+    deIdentifyReferenceElement(medicationStatement.getInformationSource());
     for (Reference reference : medicationStatement.getDerivedFrom()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : medicationStatement.getReasonReference()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
   }
 
   private void processObservation(Observation observation) {
     for (Reference reference : observation.getBasedOn()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : observation.getPartOf()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
-    removeDisplayFromReference(observation.getSubject());
+    deIdentifyReferenceElement(observation.getSubject());
     for (Reference reference : observation.getFocus()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
-    removeDisplayFromReference(observation.getEncounter());
+    deIdentifyReferenceElement(observation.getEncounter());
     for (Reference reference : observation.getPerformer()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
-    removeDisplayFromReference(observation.getSpecimen());
-    removeDisplayFromReference(observation.getDevice());
+    deIdentifyReferenceElement(observation.getSpecimen());
+    deIdentifyReferenceElement(observation.getDevice());
     for (Reference reference : observation.getHasMember()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : observation.getHasMember()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
   }
 
   private void processOperationOutcome(OperationOutcome operationOutcome) {}
 
   private void processOrganization(Organization organization) {
-    removeDisplayFromReference(organization.getPartOf());
+    deIdentifyReferenceElement(organization.getPartOf());
     for (Reference reference : organization.getEndpoint()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
   }
 
   private void processPatient(Patient patient) {
     patient.setIdentifier(new ArrayList<>());
+    patient.setExtension(new ArrayList<>());
     patient.setName(new ArrayList<>());
     patient.setTelecom(new ArrayList<>());
     patient.setAddress(new ArrayList<>());
     patient.setPhoto(new ArrayList<>());
     patient.setContact(new ArrayList<>());
-    removeDisplayFromReference(patient.getManagingOrganization());
+    deIdentifyReferenceElement(patient.getManagingOrganization());
     for (Patient.PatientLinkComponent linkComponent : patient.getLink()) {
-      removeDisplayFromReference(linkComponent.getOther());
+      deIdentifyReferenceElement(linkComponent.getOther());
     }
   }
 
@@ -579,100 +596,114 @@ public class AccessGrantedAndMutateContent implements AccessDecision {
 
   private void processProcedure(Procedure procedure) {
     for (Reference reference : procedure.getBasedOn()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : procedure.getPartOf()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
-    removeDisplayFromReference(procedure.getSubject());
-    removeDisplayFromReference(procedure.getEncounter());
-    removeDisplayFromReference(procedure.getRecorder());
-    removeDisplayFromReference(procedure.getAsserter());
-    removeDisplayFromReference(procedure.getLocation());
+    deIdentifyReferenceElement(procedure.getSubject());
+    deIdentifyReferenceElement(procedure.getEncounter());
+    deIdentifyReferenceElement(procedure.getRecorder());
+    deIdentifyReferenceElement(procedure.getAsserter());
+    deIdentifyReferenceElement(procedure.getLocation());
     for (Reference reference : procedure.getReasonReference()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : procedure.getComplicationDetail()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : procedure.getUsedReference()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
   }
 
   private void processRelatedPerson(RelatedPerson relatedPerson) {
-    removeDisplayFromReference(relatedPerson.getPatient());
+    deIdentifyReferenceElement(relatedPerson.getPatient());
   }
 
   private void processServiceRequest(ServiceRequest serviceRequest) {
     for (Reference reference : serviceRequest.getBasedOn()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : serviceRequest.getReplaces()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
-    removeDisplayFromReference(serviceRequest.getSubject());
-    removeDisplayFromReference(serviceRequest.getEncounter());
-    removeDisplayFromReference(serviceRequest.getRequester());
+    deIdentifyReferenceElement(serviceRequest.getSubject());
+    deIdentifyReferenceElement(serviceRequest.getEncounter());
+    deIdentifyReferenceElement(serviceRequest.getRequester());
     for (Reference reference : serviceRequest.getPerformer()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : serviceRequest.getLocationReference()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : serviceRequest.getReasonReference()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : serviceRequest.getInsurance()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : serviceRequest.getSupportingInfo()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : serviceRequest.getSpecimen()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : serviceRequest.getRelevantHistory()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
   }
 
   private void processSpecimen(Specimen specimen) {
-    removeDisplayFromReference(specimen.getSubject());
+    deIdentifyReferenceElement(specimen.getSubject());
     for (Reference reference : specimen.getParent()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : specimen.getRequest()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
   }
 
   private void processQuestionnaireResponse(QuestionnaireResponse questionnaireResponse) {
     for (Reference reference : questionnaireResponse.getBasedOn()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : questionnaireResponse.getPartOf()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
-    removeDisplayFromReference(questionnaireResponse.getSubject());
-    removeDisplayFromReference(questionnaireResponse.getEncounter());
-    removeDisplayFromReference(questionnaireResponse.getAuthor());
-    removeDisplayFromReference(questionnaireResponse.getSource());
+    deIdentifyReferenceElement(questionnaireResponse.getSubject());
+    deIdentifyReferenceElement(questionnaireResponse.getEncounter());
+    deIdentifyReferenceElement(questionnaireResponse.getAuthor());
+    deIdentifyReferenceElement(questionnaireResponse.getSource());
   }
 
   private void processClinicalImpression(ClinicalImpression clinicalImpression) {
-    removeDisplayFromReference(clinicalImpression.getSubject());
-    removeDisplayFromReference(clinicalImpression.getEncounter());
-    removeDisplayFromReference(clinicalImpression.getAssessor());
-    removeDisplayFromReference(clinicalImpression.getPrevious());
+    deIdentifyReferenceElement(clinicalImpression.getSubject());
+    deIdentifyReferenceElement(clinicalImpression.getEncounter());
+    deIdentifyReferenceElement(clinicalImpression.getAssessor());
+    deIdentifyReferenceElement(clinicalImpression.getPrevious());
     for (Reference reference : clinicalImpression.getProblem()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : clinicalImpression.getPrognosisReference()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
     }
     for (Reference reference : clinicalImpression.getSupportingInfo()) {
-      removeDisplayFromReference(reference);
+      deIdentifyReferenceElement(reference);
+    }
+  }
+
+  private String getIdPartFromElement(String idElementString) {
+    // Usually referenceElement and fullUrl, resource id exists in either of two formats mentioned
+    // below.
+    // "urn:uuid:<resource-id>"
+    // "<resource-type>/<resource-id>"
+    // This function will process the idElement string returns only the IdPart.
+    String[] parts = idElementString.split("[:/]");
+    if (parts.length > 1) {
+      return parts[parts.length - 1];
+    } else {
+      return idElementString;
     }
   }
 
