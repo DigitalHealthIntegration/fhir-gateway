@@ -23,7 +23,7 @@ import com.google.fhir.gateway.JwtUtil;
 import com.google.fhir.gateway.interfaces.*;
 import javax.inject.Named;
 
-public class CustomAccessChecker implements AccessChecker {
+public class DeIdentificationPlugin implements AccessChecker {
 
   private final FhirContext fhirContext;
   private final HttpFhirClient httpFhirClient;
@@ -31,7 +31,7 @@ public class CustomAccessChecker implements AccessChecker {
   private final PatientFinder patientFinder;
 
   // We're not using any of the parameters here, but real access checkers would likely use some/all.
-  private CustomAccessChecker(
+  private DeIdentificationPlugin(
       HttpFhirClient httpFhirClient,
       String claim,
       FhirContext fhirContext,
@@ -49,10 +49,10 @@ public class CustomAccessChecker implements AccessChecker {
   }
 
   // The factory must be thread-safe.
-  @Named(value = "custom")
+  @Named(value = "de-identify")
   public static class Factory implements AccessCheckerFactory {
 
-    static final String CLAIM = "custom";
+    static final String CLAIM = "de-identify";
 
     private String getClaim(DecodedJWT jwt) {
       return FhirUtil.checkIdOrFail(JwtUtil.getClaimOrDie(jwt, CLAIM));
@@ -65,7 +65,7 @@ public class CustomAccessChecker implements AccessChecker {
         FhirContext fhirContext,
         PatientFinder patientFinder) {
       String claim = getClaim(jwt);
-      return new CustomAccessChecker(httpFhirClient, claim, fhirContext, patientFinder);
+      return new DeIdentificationPlugin(httpFhirClient, claim, fhirContext, patientFinder);
     }
   }
 }
