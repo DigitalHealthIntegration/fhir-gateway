@@ -30,14 +30,29 @@ This plugin is designed to:
   -  Key: `de-identify`
   -  value: `de-identify`
   -  Ensure this attribute is included in the access token.
--  Build the jar.
-  -  `mvn package -Dspotless.apply.skip=true`
+-  Build the jar using either the terminal. (Note: If you are working on windows os, then use the poweshell instead of command prompt. )
+    -  `mvn clean package`
+    -  If the command fails, then try running the command with skip tests.
+        - `mvn clean package -DskipTeste=true`
 -  Provide the configuation parameters through environment variables.
-  -  `PROXY_TO`: The base URL of the FHIR server.
-  -  `TOKEN_ISSUER`: The URL of the access token issuer.
+  -  `PROXY_TO`: The base URL of the FHIR server. (eg: `http://localhost:8080/fhir`)
+  -  `TOKEN_ISSUER`: The URL of the access token issuer. (eg: `http://localhost:8082/auth/realms/fhir-hapi`)
   -  `BACKEND_TYPE`: "HAPI"
   -  `ACCESS_CHECKER`: "de-identify"
-  -  `LOADER_PATH`: Path of the plugin jar
+  -  `LOADER_PATH`: Path of the plugin jar (`eg.plugins/target/plugins-0.3.2.jar` Note: If it faild to load the plugin, then try with the absolute path.)
 
 -  Execute the jar
   - `java -jar exec/target/fhir-gateway-exec.jar --server.port=9002`
+- Once the proxy is running, fetch the access token from the TOKEN_ISSUER and then you can query the proxy server with the access token.
+
+  ```
+  $ curl -X POST -d 'client_id=CLIENT_ID' -d 'username=testuser' \
+    -d 'password=testpass' -d 'grant_type=password' \
+    "http://localhost:9091/auth/realms/test/protocol/openid-connect/token"
+  ```
+  ```
+  $ curl -X GET -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+  -H "Content-Type: application/json; charset=utf-8" \
+  'http://localhost:9002/Patient/'
+  ```
+  
