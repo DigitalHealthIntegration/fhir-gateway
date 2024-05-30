@@ -20,7 +20,7 @@ query parameters and resource parsing functionality which are wrapped inside
 
 ## De-identification plugin.
 
-This plugin is designed to:
+This plugin is designed to modify the response from the FHIR server before sending it to the client.
 - Remove sensitive information from the patient resource.
 - Encode all resource IDs.
 - Remove display values from all reference elements.
@@ -32,7 +32,9 @@ This plugin is designed to:
   -  Create the mapper in your keycloak client to include this attribute in the access token.
 -  Open terminal with the root directory of this repo.
 -  Build the jar by running following command in the terminal. (Note: If you are working on windows os, then use the poweshell instead of command prompt.)
-    -  `mvn clean package`
+    ```
+    mvn clean package
+    ```
     -  If the above command fails, then try running the command with skip tests.
         - `mvn clean package -DskipTeste=true`
 -  Provide the configuation parameters through environment variables.
@@ -43,7 +45,9 @@ This plugin is designed to:
   -  `LOADER_PATH`: Path of the plugin jar (`eg.plugins/target/plugins-0.3.2.jar` Note: If it fails to load the plugin, then try with the absolute path.)
 
 -  Execute the jar
-  - `java -jar exec/target/fhir-gateway-exec.jar --server.port=9002`
+  ```
+  java -jar exec/target/fhir-gateway-exec.jar --server.port=9002
+  ```
 - Once the proxy is running, fetch the access token from the TOKEN_ISSUER and then you can query the proxy server with the access token.
 
   ```
