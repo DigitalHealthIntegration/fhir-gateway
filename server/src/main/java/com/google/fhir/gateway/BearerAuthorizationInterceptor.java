@@ -283,16 +283,12 @@ public class BearerAuthorizationInterceptor {
   void mutateRequest(RequestDetails requestDetails, AccessDecision accessDecision) {
     RequestMutation mutation =
         accessDecision.getRequestMutation(new RequestDetailsToReader(requestDetails));
-    if (mutation == null) {
+    if (mutation == null || CollectionUtils.isEmpty(mutation.getQueryParams())) {
       return;
     }
-    if (!CollectionUtils.isEmpty(mutation.getQueryParams())) {
-      mutation
-          .getQueryParams()
-          .forEach((key, value) -> requestDetails.addParameter(key, value.toArray(new String[0])));
-    }
-    if (mutation.getRequestContent().length > 0) {
-      requestDetails.setRequestContents(mutation.getRequestContent());
-    }
+
+    mutation
+        .getQueryParams()
+        .forEach((key, value) -> requestDetails.addParameter(key, value.toArray(new String[0])));
   }
 }

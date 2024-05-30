@@ -16,7 +16,10 @@
 package com.google.fhir.gateway.plugin;
 
 import ca.uhn.fhir.context.FhirContext;
-import com.google.fhir.gateway.FhirUtil;
+import ca.uhn.fhir.parser.IParser;
+import com.google.common.base.Preconditions;
+import com.google.common.io.CharStreams;
+import com.google.fhir.gateway.HttpUtil;
 import com.google.fhir.gateway.interfaces.AccessDecision;
 import com.google.fhir.gateway.interfaces.RequestDetailsReader;
 import com.google.fhir.gateway.interfaces.RequestMutation;
@@ -25,6 +28,8 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import org.apache.http.HttpResponse;
+import org.hl7.fhir.instance.model.api.IBaseResource;
+import org.hl7.fhir.instance.model.api.IIdType;
 import org.hl7.fhir.r4.model.*;
 import org.jetbrains.annotations.Nullable;
 
@@ -43,22 +48,23 @@ public class AccessGrantedAndMutateContent implements AccessDecision {
   @Nullable
   @Override
   public RequestMutation getRequestMutation(RequestDetailsReader requestDetailsReader) {
-    String requestPath = requestDetailsReader.getRequestPath();
-    if (!"".equals(requestPath) && !ResourceType.Bundle.name().equals(requestPath)) {
-      return null;
-    }
-    Bundle requestBundle = FhirUtil.parseRequestToBundle(fhirContext, requestDetailsReader);
-    for (Bundle.BundleEntryComponent bundleEntryComponent : requestBundle.getEntry()) {
-      preProcess(bundleEntryComponent);
-    }
-    String bundleString = fhirContext.newJsonParser().encodeResourceToString(requestBundle);
-    return RequestMutation.builder().requestContent(bundleString.getBytes()).build();
+    return null;
   }
 
   @Override
   public String postProcess(RequestDetailsReader request, HttpResponse response)
       throws IOException {
-    return null;
+    Preconditions.checkState(HttpUtil.isResponseValid(response));
+    String content = CharStreams.toString(HttpUtil.readerFromEntity(response.getEntity()));
+    IParser parser = fhirContext.newJsonParser();
+    IBaseResource resource = parser.parseResource(content);
+
+    if (!resource.fhirType().equals(ResourceType.Bundle.name())) {
+      return "Access Denied";
+    }
+    Bundle responseBundle = (Bundle) resource;
+    processBundle(responseBundle);
+    return parser.encodeResourceToString(responseBundle);
   }
 
   public static AccessDecision accessGranted(FhirContext fhirContext) {
@@ -66,17 +72,28 @@ public class AccessGrantedAndMutateContent implements AccessDecision {
   }
 
   private void deIdentifyReferenceElement(Reference reference) {
-    String referenceString = reference.getReference();
-    if (referenceString == null) {
+
+    if (reference.getReference() == null) {
       return;
     }
-    String encodedReferenceId = encodeString(getIdPartFromElement(referenceString));
-    String referenceResourceType = reference.getResource().fhirType();
+
+    IIdType referenceElement = reference.getReferenceElement();
+
+    String referenceResourceType = referenceElement.getResourceType();
+    String referenceResourceId = referenceElement.getIdPart();
+
+    String encodedReferenceId = encodeString(getIdPartFromElement(referenceResourceId));
     reference.setReference(referenceResourceType + "/" + encodedReferenceId);
     reference.setDisplay(null);
   }
 
-  private void preProcess(Bundle.BundleEntryComponent bundleEntryComponent) {
+  private void processBundle(Bundle bundle) {
+    for (Bundle.BundleEntryComponent entryComponent : bundle.getEntry()) {
+      processEntryComponent(entryComponent);
+    }
+  }
+
+  private void processEntryComponent(Bundle.BundleEntryComponent bundleEntryComponent) {
     String fullUrl = bundleEntryComponent.getFullUrl();
     Resource resource = bundleEntryComponent.getResource();
     ResourceType resourceType = resource.getResourceType();
@@ -185,6 +202,9 @@ public class AccessGrantedAndMutateContent implements AccessDecision {
         processClinicalImpression((ClinicalImpression) resource);
         break;
       default:
+        bundleEntryComponent.setFullUrl(null);
+        bundleEntryComponent.setResource(null);
+        bundleEntryComponent.setRequest(null);
         break;
     }
   }
@@ -257,6 +277,23 @@ public class AccessGrantedAndMutateContent implements AccessDecision {
     deIdentifyReferenceElement(claim.getInsurer());
     deIdentifyReferenceElement(claim.getProvider());
     deIdentifyReferenceElement(claim.getReferral());
+    deIdentifyReferenceElement(claim.getPrescription());
+    for (Claim.SupportingInformationComponent supportingInformationComponent :
+        claim.getSupportingInfo()) {
+      deIdentifyReferenceElement(supportingInformationComponent.getValueReference());
+    }
+
+    for (Claim.DiagnosisComponent diagnosisComponent : claim.getDiagnosis()) {
+      deIdentifyReferenceElement(diagnosisComponent.getDiagnosisReference());
+    }
+    for (Claim.ItemComponent itemComponent : claim.getItem()) {
+      for (Reference reference : itemComponent.getEncounter()) {
+        deIdentifyReferenceElement(reference);
+      }
+    }
+    for (Claim.ProcedureComponent procedureComponent : claim.getProcedure()) {
+      deIdentifyReferenceElement(procedureComponent.getProcedureReference());
+    }
   }
 
   private void processComposition(Composition composition) {
